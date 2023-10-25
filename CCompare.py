@@ -8,6 +8,7 @@ import os
 import math
 replace_variables = True
 lambda_tree = 0.1
+trees = {}
 
 class Node:
     def __init__(self, node_type, value):
@@ -146,7 +147,43 @@ def make_node_list(root):
             list.append(element)
     return list
 
-def big_c(s1, s2):
+def make_node_value_list(root):
+    list = []
+    list.append(root.value)
+    for child in root.children:
+        child_list = make_node_value_list(child)
+        for element in child_list:
+            list.append(element)
+    return list
+
+def cnt(s_list, t):
+    appearances = 0
+    t_list = make_node_value_list(t)
+    if (len(s_list) > len(t_list)):
+        return 0
+    elif (s_list == t_list):
+        appearances += 1
+    else:
+        for child in t.children:
+            appearances += cnt(s_list, child)
+    return appearances
+
+def tf(s, t):
+    return cnt(make_node_value_list(s), t) / len(make_node_list(t))
+
+def idf(s, t):
+    c = 1
+    s_list = make_node_value_list(s)
+    for tree_name in trees.keys():
+        if (cnt(s_list, trees[tree_name]) > 0):
+            c += 1
+    return math.log2(1 + (len(trees) / c))
+
+def w_st(s, t):
+    return tf(s, t)
+
+def big_c(s1, s2, t1, t2):
+    # print("s1.value = " + s1.value + ", s2.value = " + s2.value)
     # Case 1: s1 and s2 both leaf nodes of the "Expression" 
     if (not s1.children and not s2.children and s1.node_type == "Expression" and s2.node_type == "Expression"):
         return edit_distance(s1.value, s2.value) / max(len(s1.value), len(s2.value)) * lambda_tree
@@ -156,7 +193,7 @@ def big_c(s1, s2):
     # Case 3: roots fo s1 and s2 are both leaf nodes
     elif (not s1.children and not s2.children):
         # should do something but use 0 for now
-        return 0
+        return lambda_tree
     else:
         result = 1
         s1_list = make_node_list(s1)
@@ -166,17 +203,19 @@ def big_c(s1, s2):
         for s1_node in s1_list:
             stree_max = 0
             for s2_node in s2_list:
-                stree_max = max(stree_max, big_c(s1_node, s2_node))
+                stree_max = max(stree_max, big_c(s1_node, s2_node, t1, t2))
             result *= 1 + stree_max
-        return result * pow(lambda_tree, min(tree_height(s1), tree_height(s2)))
+        height = min(tree_height(s1), tree_height(s2))
+        return result * pow(lambda_tree, height)
 
 def kernel_function(t1, t2):
     t1_list = make_node_list(t1)
     t2_list = make_node_list(t2)
     kernel_score = 0
     for t1_node in t1_list:
+        # print(t1_node.value)
         for t2_node in t2_list:
-            kernel_score += big_c(t1_node, t2_node)
+            kernel_score += big_c(t1_node, t2_node, t1, t2)
     return kernel_score
 
 
@@ -195,18 +234,19 @@ parser = CParser(stream)
 tree = parser.compilationUnit()
 
 target_root = convert_antlr_tree_to_custom_tree(tree)
+trees["func_target.c"] = target_root
 
-# visualize_custom_tree(root)
+# visualize_custom_tree(target_root)
 
 # tree to string test
-# a = Node("test", "a")
+# a = Node("test", "a1")
 # b = Node("test", "b")
 # c = Node("test", "c")
 # d = Node("test", "d")
 # e = Node("test", "e")
 # b.children = [e, d]
 # a.children = [c, b]
-# test_str = tree_to_string(a)
+# test_str = make_node_value_list(a)
 # print(test_str)
 
 # common substring test
@@ -220,12 +260,38 @@ target_root = convert_antlr_tree_to_custom_tree(tree)
 # str2 = "sitting"  
 # print(edit_distance(str1, str2)) 
 
-# target_str = tree_to_string(root)
-# print(target_str)
+# cnt test
+# a = Node("test", "a")
+# b = Node("test", "b")
+# c = Node("test", "c")
+# d = Node("test", "d")
+# e = Node("test", "e")
+# b.children = [e, d]
+# a.children = [c, b]
+# print(cnt([b, e, d], a))
 
-kt2t2 = kernel_function(target_root, target_root)
-# print("kt2t2 = " + str(kt2t2))
+# w_st test
+# a = Node("test", "a")
+# b = Node("test", "b")
+# c = Node("test", "c")
+# d = Node("test", "d")
+# e = Node("test", "e")
+# b.children = [e, d]
+# a.children = [c, b]
+# trees["a"] = a
 
+# a2 = Node("test", "a")
+# b2 = Node("test", "b")
+# c2 = Node("test", "c")
+# d2 = Node("test", "d")
+# e2 = Node("test", "e")
+# b2.children = [a, d]
+# a2.children = [c, e]
+# trees["b2"] = b2
+
+# print(w_st(b, a))
+
+# generate trees
 for func_file in os.listdir("CCompare/funcs"):
     with open("CCompare/funcs/" + func_file, "r") as c_file:
         c_code = c_file.read()
@@ -242,16 +308,23 @@ for func_file in os.listdir("CCompare/funcs"):
     tree = parser.compilationUnit()
 
     root = convert_antlr_tree_to_custom_tree(tree)
+    trees[func_file] = root
 
     # visualize_custom_tree(root)
 
-    # func_str = tree_to_string(root)
-    # print(func_str)
+# w_st test2
+# print("w_st test2")
+# print(w_st(target_root.children[0], target_root))
 
+kt2t2 = kernel_function(target_root, target_root)
+print("kt2t2 done")
+
+# do the comparisons
+for func_file in os.listdir("CCompare/funcs"):
     # Normalize tree kernel
-    kt1t1 = kernel_function(root, root)
+    kt1t1 = kernel_function(trees[func_file], trees[func_file])
     # print("kt1t1 = " + str(kt1t1))
-    kt1t2 = kernel_function(root, target_root)
+    kt1t2 = kernel_function(trees[func_file], target_root)
     # print("kt1t2 = " + str(kt1t2))
     kprime = kt1t2 / math.sqrt(kt1t1 * kt2t2)
     print(func_file + ": " + str(kprime))
