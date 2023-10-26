@@ -53,6 +53,10 @@ def convert_antlr_tree_to_custom_tree(antlr_node):
     # For non-terminal nodes, use the node type as the value
     else:
         value = node_type
+        # combine nodes that have only 1 child
+        while (len(list(antlr_node.getChildren())) == 1 and not isinstance(list(antlr_node.getChildren())[0], antlr4.TerminalNode)):
+            antlr_node = list(antlr_node.getChildren())[0]
+            value += "\n" + antlr_node.__class__.__name__
         # Handle non-terminal nodes by recursively converting children
         for child in antlr_node.getChildren():
             child_node = convert_antlr_tree_to_custom_tree(child)
@@ -180,20 +184,29 @@ def idf(s, t):
     return math.log2(1 + (len(trees) / c))
 
 def w_st(s, t):
-    return tf(s, t)
+    return tf(s, t) * idf(s, t)
 
 def big_c(s1, s2, t1, t2):
     # print("s1.value = " + s1.value + ", s2.value = " + s2.value)
+    # * w_st(s1, t1) * w_st(s2, t2)
     # Case 1: s1 and s2 both leaf nodes of the "Expression" 
     if (not s1.children and not s2.children and s1.node_type == "Expression" and s2.node_type == "Expression"):
-        return edit_distance(s1.value, s2.value) / max(len(s1.value), len(s2.value)) * lambda_tree
+        # print("s1.value = " + s1.value + ", s2.value = " + s2.value)
+        dist = edit_distance(s1.value, s2.value) / max(len(s1.value), len(s2.value))
+        # if ("b<" in s1.value and "b<" in s2.value):
+        #     print("s1.value = " + s1.value + ", s2.value = " + s2.value)
+        #     print(dist)
+        if (dist == 0):
+            return lambda_tree
+        else:
+            return dist * lambda_tree
     # Case 2: root of s1 is different from root of s2
     elif (s1.node_type != s2.node_type and s1.value != s2.value):
         return 0
     # Case 3: roots fo s1 and s2 are both leaf nodes
     elif (not s1.children and not s2.children):
         # should do something but use 0 for now
-        return lambda_tree
+        return 0
     else:
         result = 1
         s1_list = make_node_list(s1)
@@ -205,7 +218,11 @@ def big_c(s1, s2, t1, t2):
             for s2_node in s2_list:
                 stree_max = max(stree_max, big_c(s1_node, s2_node, t1, t2))
             result *= 1 + stree_max
-        height = min(tree_height(s1), tree_height(s2))
+            # l = []
+            # for s2_node in s2_list:
+            #     l.append(big_c(s1_node, s2_node, t1, t2))
+            # result *= 1 + max(l)
+        height = max(tree_height(s1), tree_height(s2))
         return result * pow(lambda_tree, height)
 
 def kernel_function(t1, t2):
@@ -310,21 +327,28 @@ for func_file in os.listdir("CCompare/funcs"):
     root = convert_antlr_tree_to_custom_tree(tree)
     trees[func_file] = root
 
-    # visualize_custom_tree(root)
-
 # w_st test2
 # print("w_st test2")
 # print(w_st(target_root.children[0], target_root))
 
 kt2t2 = kernel_function(target_root, target_root)
-print("kt2t2 done")
+print("kt2t2 = " + str(kt2t2))
+print()
 
+result_list = []
 # do the comparisons
 for func_file in os.listdir("CCompare/funcs"):
+    print(func_file)
     # Normalize tree kernel
     kt1t1 = kernel_function(trees[func_file], trees[func_file])
-    # print("kt1t1 = " + str(kt1t1))
+    print("kt1t1 = " + str(kt1t1))
     kt1t2 = kernel_function(trees[func_file], target_root)
-    # print("kt1t2 = " + str(kt1t2))
+    print("kt1t2 = " + str(kt1t2))
     kprime = kt1t2 / math.sqrt(kt1t1 * kt2t2)
+    result_list.append(func_file + ": " + str(kprime))
     print(func_file + ": " + str(kprime))
+    print()
+
+print("summary")
+for line in result_list:
+    print(line)

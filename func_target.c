@@ -1,8 +1,7 @@
 int main() {
-    int a = 0;
-    a++;
-    for (int b = 0; b < 10; b++) {
+    int i = 0;
+    while (i < 10) {
         printf("test");
+        i++;
     }
-    return 0;
 }
