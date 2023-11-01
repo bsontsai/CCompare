@@ -18,7 +18,10 @@ class Node:
 
 def get_expression(antlr_node):
     if isinstance(antlr_node, antlr4.TerminalNode):
-        return antlr_node.getSymbol().text
+        if (replace_variables and antlr_node.getSymbol().type == CLexer.Identifier):
+            return "var"
+        else:
+            return antlr_node.getSymbol().text
     str = ""
     for child in antlr_node.getChildren():
         str += get_expression(child)
@@ -205,7 +208,7 @@ def big_c(s1, s2, t1, t2):
         return 0
     # Case 3: roots fo s1 and s2 are both leaf nodes
     elif (not s1.children and not s2.children):
-        # should do something but use 0 for now
+        # use 0 to enlarge difference
         return 0
     else:
         result = 1
@@ -253,7 +256,7 @@ tree = parser.compilationUnit()
 target_root = convert_antlr_tree_to_custom_tree(tree)
 trees["func_target.c"] = target_root
 
-# visualize_custom_tree(target_root)
+visualize_custom_tree(target_root)
 
 # tree to string test
 # a = Node("test", "a1")
@@ -335,7 +338,7 @@ kt2t2 = kernel_function(target_root, target_root)
 print("kt2t2 = " + str(kt2t2))
 print()
 
-result_list = []
+result_dict = {}
 # do the comparisons
 for func_file in os.listdir("CCompare/funcs"):
     print(func_file)
@@ -345,10 +348,11 @@ for func_file in os.listdir("CCompare/funcs"):
     kt1t2 = kernel_function(trees[func_file], target_root)
     print("kt1t2 = " + str(kt1t2))
     kprime = kt1t2 / math.sqrt(kt1t1 * kt2t2)
-    result_list.append(func_file + ": " + str(kprime))
+    result_dict[kprime] = func_file
     print(func_file + ": " + str(kprime))
     print()
 
+sorted_result_dict = dict(sorted(result_dict.items(), reverse=True))
 print("summary")
-for line in result_list:
-    print(line)
+for key in sorted_result_dict.keys():
+    print(sorted_result_dict[key] + ": " + str(key))

@@ -1,9 +1,5 @@
-#include <stdio.h>
-int func_4() {
-    if (1 == 2) {
-        printf("test");
-    }
-    int b = 0;
+int func_6() {
+    long b = 1;
     switch(b) {
         case 1:
             printf("1");
@@ -12,8 +8,4 @@ int func_4() {
         default:
             printf("default");
     }
-    while (b < 10) {
-        b++;
-    }
-    return 0;
 }
